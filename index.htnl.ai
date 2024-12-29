@@ -1,0 +1,384 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Starship Escape</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: Arial, sans-serif;
+            color: #fff;
+        }
+
+        #game-container {
+            width: 800px;
+            height: 600px;
+            position: relative;
+            margin: 20px auto;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600"><rect width="100%" height="100%" fill="%23000"/><circle cx="50%" cy="50%" r="200" fill="none" stroke="%23333" stroke-width="2"/></svg>');
+        }
+
+        #starship {
+            width: 40px;
+            height: 40px;
+            position: absolute;
+            bottom: 50px;
+            left: 380px;
+            background: linear-gradient(45deg, #4a90e2, #87ceeb);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            transition: transform 0.2s;
+        }
+
+        .obstacle {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #ff4444;
+        }
+
+        .asteroid {
+            background: #8b4513;
+            border-radius: 50%;
+        }
+
+        .laser {
+            background: #ff0000;
+            height: 10px;
+            width: 3px;
+        }
+
+        .blackhole {
+            background: radial-gradient(circle, #000 60%, #4a0080 100%);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+        }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+        }
+
+        #zone-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 5px;
+            color: #4a90e2;
+        }
+
+        .upgrade-menu {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #4a90e2;
+        }
+
+        .upgrade-button {
+            margin: 5px;
+            padding: 8px;
+            background: #4a90e2;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        #shield {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid #4a90e2;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        #start-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="starship">
+            <div id="shield"></div>
+        </div>
+        <div id="hud">
+            <div id="score">Score: 0</div>
+            <div id="shield-strength">Shield: 100%</div>
+            <div id="speed-level">Speed: 1</div>
+        </div>
+        <div id="zone-indicator">Zone: Normal Space</div>
+        <button id="start-button">Start Escape</button>
+        <div class="upgrade-menu" id="upgrade-menu">
+            <h2>Upgrades</h2>
+            <button class="upgrade-button" data-upgrade="shield">Upgrade Shield (100 pts)</button>
+            <button class="upgrade-button" data-upgrade="speed">Upgrade Speed (150 pts)</button>
+            <button class="upgrade-button" data-upgrade="weapons">Upgrade Weapons (200 pts)</button>
+        </div>
+    </div>
+
+    <script>
+        const starship = document.getElementById('starship');
+        const gameContainer = document.getElementById('game-container');
+        const scoreElement = document.getElementById('score');
+        const startButton = document.getElementById('start-button');
+        const shieldElement = document.getElementById('shield-strength');
+        const speedElement = document.getElementById('speed-level');
+        const zoneIndicator = document.getElementById('zone-indicator');
+        
+        let score = 0;
+        let gameRunning = false;
+        let obstacles = [];
+        let shieldStrength = 100;
+        let speedLevel = 1;
+        let currentZone = 'normal';
+        let zoneTimer = 0;
+        
+        const zones = {
+            normal: {
+                name: 'Normal Space',
+                backgroundColor: '#000',
+                obstacleTypes: ['asteroid'],
+                gravity: 1
+            },
+            gravity: {
+                name: 'Gravity Well',
+                backgroundColor: '#1a0066',
+                obstacleTypes: ['asteroid', 'blackhole'],
+                gravity: 1.5
+            },
+            temporal: {
+                name: 'Time Distortion',
+                backgroundColor: '#400040',
+                obstacleTypes: ['laser', 'asteroid'],
+                gravity: 0.7
+            }
+        };
+
+        function changeZone() {
+            const zoneKeys = Object.keys(zones);
+            currentZone = zoneKeys[Math.floor(Math.random() * zoneKeys.length)];
+            const zone = zones[currentZone];
+            
+            gameContainer.style.backgroundColor = zone.backgroundColor;
+            zoneIndicator.textContent = `Zone: ${zone.name}`;
+            
+            // Apply zone effects
+            if (currentZone === 'gravity') {
+                applyGravityEffect();
+            } else if (currentZone === 'temporal') {
+                applyTemporalEffect();
+            }
+        }
+
+        function applyGravityEffect() {
+            obstacles.forEach(obstacle => {
+                if (obstacle.classList.contains('blackhole')) {
+                    const blackholeRect = obstacle.getBoundingClientRect();
+                    const shipRect = starship.getBoundingClientRect();
+                    const dx = blackholeRect.x - shipRect.x;
+                    const dy = blackholeRect.y - shipRect.y;
+                    // Apply gravitational pull
+                    starship.style.left = (parseInt(starship.style.left) + dx * 0.01) + 'px';
+                }
+            });
+        }
+
+        function applyTemporalEffect() {
+            // Random time dilation effects
+            const timeScale = Math.random() * 0.5 + 0.75;
+            obstacles.forEach(obstacle => {
+                obstacle.style.animationDuration = `${timeScale}s`;
+            });
+        }
+
+        function createObstacle() {
+            const obstacle = document.createElement('div');
+            const zone = zones[currentZone];
+            const obstacleType = zone.obstacleTypes[Math.floor(Math.random() * zone.obstacleTypes.length)];
+            
+            obstacle.className = `obstacle ${obstacleType}`;
+            obstacle.style.left = Math.random() * 770 + 'px';
+            obstacle.style.top = '-30px';
+            gameContainer.appendChild(obstacle);
+            obstacles.push(obstacle);
+        }
+
+        function moveObstacles() {
+            obstacles.forEach((obstacle, index) => {
+                const top = parseInt(window.getComputedStyle(obstacle).top);
+                const moveSpeed = zones[currentZone].gravity * (5 + Math.floor(score / 1000));
+                
+                if (top > 600) {
+                    obstacle.remove();
+                    obstacles.splice(index, 1);
+                    score += 10;
+                    scoreElement.textContent = `Score: ${score}`;
+                    
+                    // Check for upgrade availability
+                    if (score % 100 === 0) {
+                        showUpgradeMenu();
+                    }
+                } else {
+                    obstacle.style.top = (top + moveSpeed) + 'px';
+                    checkCollision(obstacle);
+                }
+            });
+        }
+
+        function checkCollision(obstacle) {
+            const shipRect = starship.getBoundingClientRect();
+            const obstacleRect = obstacle.getBoundingClientRect();
+
+            if (!(shipRect.right < obstacleRect.left || 
+                shipRect.left > obstacleRect.right || 
+                shipRect.bottom < obstacleRect.top || 
+                shipRect.top > obstacleRect.bottom)) {
+                
+                if (shieldStrength > 0) {
+                    shieldStrength -= 20;
+                    shieldElement.textContent = `Shield: ${shieldStrength}%`;
+                    obstacle.remove();
+                    obstacles.splice(obstacles.indexOf(obstacle), 1);
+                    
+                    if (shieldStrength <= 0) {
+                        document.getElementById('shield').style.opacity = '0';
+                    }
+                } else {
+                    gameOver();
+                }
+            }
+        }
+
+        function showUpgradeMenu() {
+            document.getElementById('upgrade-menu').style.display = 'block';
+            gameRunning = false;
+        }
+
+        function upgradeShip(type) {
+            switch(type) {
+                case 'shield':
+                    if (score >= 100) {
+                        score -= 100;
+                        shieldStrength = 100;
+                        document.getElementById('shield').style.opacity = '1';
+                    }
+                    break;
+                case 'speed':
+                    if (score >= 150) {
+                        score -= 150;
+                        speedLevel++;
+                        speedElement.textContent = `Speed: ${speedLevel}`;
+                    }
+                    break;
+                case 'weapons':
+                    if (score >= 200) {
+                        score -= 200;
+                        // Add weapon functionality here
+                    }
+                    break;
+            }
+            scoreElement.textContent = `Score: ${score}`;
+            document.getElementById('upgrade-menu').style.display = 'none';
+            gameRunning = true;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            
+            const left = parseInt(window.getComputedStyle(starship).left);
+            const moveDistance = 10 * speedLevel;
+            
+            if (e.key === 'ArrowLeft' && left > 0) {
+                starship.style.left = (left - moveDistance) + 'px';
+                starship.style.transform = 'rotate(-15deg)';
+            }
+            if (e.key === 'ArrowRight' && left < 750) {
+                starship.style.left = (left + moveDistance) + 'px';
+                starship.style.transform = 'rotate(15deg)';
+            }
+        });
+
+        document.addEventListener('keyup', () => {
+            starship.style.transform = 'rotate(0deg)';
+        });
+
+        function gameOver() {
+            gameRunning = false;
+            alert(`Game Over! Final Score: ${score}`);
+            resetGame();
+        }
+
+        function resetGame() {
+            obstacles.forEach(obstacle => obstacle.remove());
+            obstacles = [];
+            score = 0;
+            shieldStrength = 100;
+            speedLevel = 1;
+            currentZone = 'normal';
+            scoreElement.textContent = 'Score: 0';
+            shieldElement.textContent = 'Shield: 100%';
+            speedElement.textContent = 'Speed: 1';
+            document.getElementById('shield').style.opacity = '1';
+            startButton.style.display = 'block';
+            gameContainer.style.backgroundColor = '#000';
+        }
+
+        function gameLoop() {
+            if (!gameRunning) return;
+            
+            zoneTimer++;
+            if (zoneTimer > 300) { // Change zone every ~5 seconds
+                changeZone();
+                zoneTimer = 0;
+            }
+            
+            if (Math.random() < 0.02) {
+                createObstacle();
+            }
+            moveObstacles();
+            requestAnimationFrame(gameLoop);
+        }
+
+        startButton.addEventListener('click', () => {
+            gameRunning = true;
+            startButton.style.display = 'none';
+            gameLoop();
+        });
+
+        // Setup upgrade buttons
+        document.querySelectorAll('.upgrade-button').forEach(button => {
+            button.addEventListener('click', () => {
+                upgradeShip(button.dataset.upgrade);
+            });
+        });
+    </script>
+</body>
+</html>

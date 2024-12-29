@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STARSHIP ESCAPE</title>
+    <style>
+        body {
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(to bottom, #1a0033, #000066);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+        }
+
+        .title-container {
+            text-align: center;
+            z-index: 1;
+        }
+
+        .game-title {
+            font-size: 72px;
+            color: white;
+            text-shadow: 0 0 20px #4ff0ff;
+            margin-bottom: 50px;
+        }
+
+        .button {
+            padding: 20px 80px;
+            font-size: 32px;
+            background: transparent;
+            border: 3px solid #4ff0ff;
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: block;
+            margin: 20px auto;
+        }
+
+        .button:hover {
+            background: rgba(79, 240, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 33, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            border: 3px solid #4ff0ff;
+            box-shadow: 0 0 30px rgba(79, 240, 255, 0.3);
+            z-index: 100;
+        }
+
+        .mode-button {
+            padding: 15px 60px;
+            font-size: 24px;
+            background: transparent;
+            border: 2px solid #4ff0ff;
+            color: white;
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: block;
+            margin: 15px auto;
+            width: 200px;
+        }
+
+        .mode-button:hover {
+            background: rgba(79, 240, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .close-button {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+        }
+
+        .modal-title {
+            color: white;
+            font-size: 36px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px #4ff0ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="title-container">
+        <h1 class="game-title">STARSHIP ESCAPE</h1>
+        <button class="button" onclick="openModes()">PLAY</button>
+        <button class="button" onclick="window.location.href='store.html'">STORE</button>
+    </div>
+
+    <!-- Modes Modal -->
+    <div id="modes-modal" class="modal">
+        <button class="close-button" onclick="closeModes()">×</button>
+        <h2 class="modal-title">SELECT MODE</h2>
+        <button class="mode-button" onclick="startGame('easy')">EASY MODE</button>
+        <button class="mode-button" onclick="startGame('hard')">HARD MODE</button>
+        <button class="mode-button" onclick="startGame('fast')">FAST MODE</button>
+    </div>
+
+    <script>
+        function openModes() {
+            document.getElementById('modes-modal').style.display = 'block';
+        }
+
+        function closeModes() {
+            document.getElementById('modes-modal').style.display = 'none';
+        }
+
+        function startGame(mode) {
+            window.location.href = `game.html?mode=${mode}`;
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STARSHIP ESCAPE - Store</title>
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: Arial;
+            text-align: center;
+            padding-top: 100px;
+        }
+
+        button {
+            font-size: 24px;
+            padding: 20px 40px;
+            margin: 20px;
+            cursor: pointer;
+        }
+
+        .menu-button {
+            background: red;
+            color: white;
+            border: none;
+            border-radius: 10px;
+        }
+
+        .upgrade-button {
+            background: blue;
+            color: white;
+            border: none;
+            border-radius: 10px;
+        }
+
+        .maxed {
+            color: #4ff0ff;
+            text-shadow: 0 0 10px #4ff0ff;
+        }
+        
+        .upgrade-button.maxed {
+            background: #4ff0ff;
+            color: black;
+            cursor: not-allowed;
+        }
+    </style>
+</head>
+<body>
+    <div class="store-container">
+        <h1>SHIP STORE</h1>
+        
+        <div class="coins">
+            Coins: <span id="coin-display">0</span>
+        </div>
+
+        <div class="upgrade-box">
+            <h2>Shield Upgrade</h2>
+            <p>Level: <span id="shield-level">1</span></p>
+            <p>Duration: <span id="shield-duration">5</span>s</p>
+            <p>Cooldown: <span id="shield-cooldown">30</span>s</p>
+            <p>Cost: <span id="shield-cost">100</span> coins</p>
+            <button onclick="upgradeShield()" id="upgrade-button">UPGRADE</button>
+        </div>
+
+        <button id="menu-button" onclick="window.location.href='index.html'">BACK TO MENU</button>
+    </div>
+
+    <script>
+        let coins = parseInt(localStorage.getItem('coins')) || 0;
+        let shieldLevel = parseInt(localStorage.getItem('shieldLevel')) || 1;
+        const MAX_LEVEL = 5;
+        
+        function getUpgradeCost(level) {
+            // Increasing cost: 100, 200, 400, 800
+            return 100 * Math.pow(2, level - 1);
+        }
+
+        function upgradeShield() {
+            if (shieldLevel >= MAX_LEVEL) {
+                alert('Shield is already at maximum level!');
+                return;
+            }
+
+            const cost = getUpgradeCost(shieldLevel);
+            
+            if (coins >= cost) {
+                // Play upgrade sound
+                playUpgradeSound();
+                
+                // Deduct coins and upgrade
+                coins -= cost;
+                shieldLevel++;
+                
+                // Save to localStorage
+                localStorage.setItem('coins', coins);
+                localStorage.setItem('shieldLevel', shieldLevel);
+                
+                // Update display
+                updateDisplay();
+            } else {
+                alert('Not enough coins! You need ' + cost + ' coins.');
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('coin-display').textContent = coins;
+            document.getElementById('shield-level').textContent = 
+                shieldLevel >= MAX_LEVEL ? 'MAXED' : shieldLevel;
+            document.getElementById('shield-duration').textContent = 5 + (shieldLevel - 1) * 2;
+            document.getElementById('shield-cooldown').textContent = Math.max(30 - (shieldLevel - 1) * 5, 10);
+            
+            const upgradeButton = document.getElementById('upgrade-button');
+            if (shieldLevel >= MAX_LEVEL) {
+                upgradeButton.textContent = 'MAXED';
+                upgradeButton.classList.add('maxed');
+                document.getElementById('shield-cost').textContent = 'MAXED';
+            } else {
+                upgradeButton.textContent = 'UPGRADE';
+                upgradeButton.classList.remove('maxed');
+                document.getElementById('shield-cost').textContent = getUpgradeCost(shieldLevel);
+            }
+        }
+
+        function playUpgradeSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(600, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.2);
+            oscillator.stop(audioContext.currentTime + 0.2);
+        }
+
+        // Initialize display when page loads
+        updateDisplay();
+    </script>
+</body>
+</html>

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>STARSHIP ESCAPE</title>
+    <style>
+        #gameContainer {
+            width: 100%;
+            height: 100vh;
+            background: black;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #player {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(to bottom, #4ff0ff, #2980ff);
+            clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+            border: 2px solid #4ff0ff;
+            box-shadow: 0 0 10px #4ff0ff;
+        }
+
+        .asteroid {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: linear-gradient(45deg, #8B4513, #A0522D);
+            border-radius: 8px;
+            box-shadow: 
+                inset -3px -3px 10px #654321,
+                inset 5px 5px 5px rgba(255,255,255,0.1);
+            transform: rotate(45deg);
+            border: 2px solid #654321;
+            overflow: hidden;
+        }
+
+        .asteroid::before {
+            content: '';
+            position: absolute;
+            width: 15px;
+            height: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 50%;
+            top: 5px;
+            left: 5px;
+        }
+
+        .golden-coin {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            background: linear-gradient(45deg, #ffd700, #ffb347);
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ffd700;
+            animation: coinSpin 1s linear infinite;
+        }
+
+        #coin-counter {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: gold;
+            font-size: 24px;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        }
+
+        #shield-status {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            color: #4ff0ff;
+            font-size: 20px;
+            text-shadow: 0 0 10px #4ff0ff;
+        }
+
+        #shield-timer {
+            position: fixed;
+            top: 90px;
+            right: 20px;
+            color: #4ff0ff;
+            font-size: 24px;
+            text-shadow: 0 0 10px #4ff0ff;
+        }
+
+        .shield-active {
+            box-shadow: 0 0 20px #4ff0ff, 0 0 40px #4ff0ff !important;
+            border-radius: 50%;
+        }
+
+        @keyframes coinSpin {
+            from { transform: rotateY(0deg); }
+            to { transform: rotateY(360deg); }
+        }
+
+        /* Game Over Menu */
+        #gameOverScreen {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid #4ff0ff;
+            box-shadow: 0 0 20px #4ff0ff;
+            text-align: center;
+            color: white;
+            z-index: 1000;
+        }
+
+        #gameOverScreen h1 {
+            color: #4ff0ff;
+            font-size: 36px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px #4ff0ff;
+        }
+
+        #gameOverScreen p {
+            font-size: 24px;
+            margin: 10px 0;
+            color: #fff;
+        }
+
+        #gameOverScreen button {
+            background: #4ff0ff;
+            border: none;
+            padding: 15px 30px;
+            margin: 10px;
+            border-radius: 10px;
+            font-size: 20px;
+            color: black;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #gameOverScreen button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 20px #4ff0ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="player"></div>
+    </div>
+
+    <div id="gameOverScreen">
+        <h1>GAME OVER</h1>
+        <p>Score: <span id="finalScore">0</span></p>
+        <p>Coins Collected: <span id="finalCoins">0</span></p>
+        <button onclick="restartGame()">Play Again</button>
+        <button onclick="window.location.href='index.html'">Main Menu</button>
+    </div>
+
+    <script>
+        const player = document.getElementById('player');
+        const gameContainer = document.getElementById('gameContainer');
+        let gameRunning = true;
+        let score = 0;
+        let coins = parseInt(localStorage.getItem('coins')) || 0;
+        let shieldActive = false;
+        let shieldCooldown = false;
+        let shieldLevel = parseInt(localStorage.getItem('shieldLevel')) || 1;
+        let playerX = window.innerWidth / 2;
+        let playerY = window.innerHeight - 100;
+        let asteroidSpeed = 3;
+
+        // Create displays
+        const coinCounter = document.createElement('div');
+        coinCounter.id = 'coin-counter';
+        coinCounter.textContent = `Coins: ${coins}`;
+        gameContainer.appendChild(coinCounter);
+
+        const shieldStatus = document.createElement('div');
+        shieldStatus.id = 'shield-status';
+        shieldStatus.textContent = 'SHIELD READY';
+        gameContainer.appendChild(shieldStatus);
+
+        const shieldTimer = document.createElement('div');
+        shieldTimer.id = 'shield-timer';
+        shieldTimer.style.display = 'none';
+        gameContainer.appendChild(shieldTimer);
+
+        // Set initial position
+        player.style.left = playerX + 'px';
+        player.style.top = playerY + 'px';
+
+        // Movement controls
+        document.addEventListener('keydown', function(e) {
+            if (!gameRunning) return;
+
+            const speed = 10;
+            switch(e.key.toLowerCase()) {
+                case 'a':
+                case 'arrowleft':
+                    playerX = Math.max(0, playerX - speed);
+                    break;
+                case 'd':
+                case 'arrowright':
+                    playerX = Math.min(window.innerWidth - 50, playerX + speed);
+                    break;
+                case ' ':
+                    if (!shieldActive && !shieldCooldown) activateShield();
+                    break;
+            }
+            
+            // Only update X position, Y stays fixed
+            player.style.left = playerX + 'px';
+        });
+
+        // Shield functions
+        function activateShield() {
+            shieldActive = true;
+            player.classList.add('shield-active');
+            shieldStatus.textContent = 'SHIELD ACTIVE';
+            shieldTimer.style.display = 'block';
+
+            const duration = 5 + (shieldLevel - 1) * 2;
+            let timeLeft = duration;
+
+            const timerInterval = setInterval(() => {
+                timeLeft--;
+                shieldTimer.textContent = timeLeft + 's';
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    deactivateShield();
+                }
+            }, 1000);
+        }
+
+        function deactivateShield() {
+            shieldActive = false;
+            player.classList.remove('shield-active');
+            shieldTimer.style.display = 'none';
+            shieldCooldown = true;
+            shieldStatus.textContent = 'SHIELD COOLING';
+            
+            const cooldown = Math.max(30 - (shieldLevel - 1) * 5, 10);
+            setTimeout(() => {
+                shieldCooldown = false;
+                shieldStatus.textContent = 'SHIELD READY';
+            }, cooldown * 1000);
+        }
+
+        // Create asteroids
+        function createAsteroid() {
+            if (!gameRunning) return;
+
+            const asteroid = document.createElement('div');
+            asteroid.className = 'asteroid';
+            asteroid.style.left = Math.random() * (window.innerWidth - 40) + 'px';
+            asteroid.style.top = '-50px';
+            gameContainer.appendChild(asteroid);
+
+            let posY = -50;
+
+            function updateAsteroid() {
+                if (!gameRunning) {
+                    asteroid.remove();
+                    return;
+                }
+
+                posY += asteroidSpeed;
+                asteroid.style.top = posY + 'px';
+
+                const asteroidRect = asteroid.getBoundingClientRect();
+                const playerRect = player.getBoundingClientRect();
+
+                if (asteroidRect.left < playerRect.right &&
+                    asteroidRect.right > playerRect.left &&
+                    asteroidRect.top < playerRect.bottom &&
+                    asteroidRect.bottom > playerRect.top) {
+                    
+                    if (shieldActive) {
+                        asteroid.remove();
+                        updateScore();
+                        return;
+                    } else {
+                        gameOver();
+                        return;
+                    }
+                }
+
+                if (posY > window.innerHeight) {
+                    asteroid.remove();
+                    updateScore();
+                } else {
+                    requestAnimationFrame(updateAsteroid);
+                }
+            }
+
+            requestAnimationFrame(updateAsteroid);
+        }
+
+        // Create coins
+        function createCoin() {
+            if (!gameRunning) return;
+
+            const coin = document.createElement('div');
+            coin.className = 'golden-coin';
+            coin.style.left = Math.random() * (window.innerWidth - 25) + 'px';
+            coin.style.top = '-25px';
+            gameContainer.appendChild(coin);
+
+            let posY = -25;
+
+            function updateCoin() {
+                if (!gameRunning) {
+                    coin.remove();
+                    return;
+                }
+
+                posY += asteroidSpeed;
+                coin.style.top = posY + 'px';
+
+                const coinRect = coin.getBoundingClientRect();
+                const playerRect = player.getBoundingClientRect();
+
+                if (coinRect.left < playerRect.right &&
+                    coinRect.right > playerRect.left &&
+                    coinRect.top < playerRect.bottom &&
+                    coinRect.bottom > playerRect.top) {
+                    
+                    // Play sound when collecting coin
+                    playCollectSound();
+                    
+                    // Show +10 text effect
+                    const sparkle = document.createElement('div');
+                    sparkle.style.position = 'absolute';
+                    sparkle.style.left = coinRect.left + 'px';
+                    sparkle.style.top = coinRect.top + 'px';
+                    sparkle.style.color = 'gold';
+                    sparkle.style.fontSize = '20px';
+                    sparkle.textContent = '+10';
+                    sparkle.style.animation = 'float-up 1s forwards';
+                    gameContainer.appendChild(sparkle);
+                    
+                    setTimeout(() => sparkle.remove(), 1000);
+                    
+                    coins += 10;
+                    localStorage.setItem('coins', coins);
+                    coinCounter.textContent = `Coins: ${coins}`;
+                    coin.remove();
+                    return;
+                }
+
+                if (posY > window.innerHeight) {
+                    coin.remove();
+                } else {
+                    requestAnimationFrame(updateCoin);
+                }
+            }
+
+            requestAnimationFrame(updateCoin);
+        }
+
+        // Game functions
+        function updateScore() {
+            score++;
+            if (score % 10 === 0) asteroidSpeed += 0.5;
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            localStorage.setItem('coins', coins);
+            
+            // Update and show game over screen
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('finalCoins').textContent = coins;
+            document.getElementById('gameOverScreen').style.display = 'block';
+        }
+
+        // Add restart function
+        function restartGame() {
+            gameRunning = true;
+            score = 0;
+            asteroidSpeed = 3;
+            resetPlayerPosition(); // Use the reset function
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // Clear any remaining asteroids and coins
+            const asteroids = document.querySelectorAll('.asteroid');
+            const coins = document.querySelectorAll('.golden-coin');
+            asteroids.forEach(a => a.remove());
+            coins.forEach(c => c.remove());
+        }
+
+        // Add this function for the coin sound
+        function playCollectSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // Higher pitch
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime); // Lower volume
+            
+            oscillator.start();
+            gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.1);
+            oscillator.stop(audioContext.currentTime + 0.1);
+        }
+
+        // Start game loops
+        setInterval(createAsteroid, 2000);
+        setInterval(createCoin, 3000);
+
+        // Add floating animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes float-up {
+                0% {
+                    transform: translateY(0);
+                    opacity: 1;
+                }
+                100% {
+                    transform: translateY(-50px);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Set initial position (fixed Y)
+        function resetPlayerPosition() {
+            playerX = window.innerWidth / 2;
+            playerY = window.innerHeight - 100; // Fixed Y position
+            player.style.left = playerX + 'px';
+            player.style.top = playerY + 'px';
+        }
+
+        // Call this when game starts
+        resetPlayerPosition();
+    </script>
+</body>
+</html> 
